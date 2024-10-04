@@ -1,4 +1,4 @@
-#README
+# README
 
 Contains R code for reproducing the C. elegans paper analysis and visualizaiton portion. 
 Mapping and quantification were made prior with custom scripts. 
