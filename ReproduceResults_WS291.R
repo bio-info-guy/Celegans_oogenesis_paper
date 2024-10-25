@@ -1,4 +1,4 @@
-# Preparation With Mappings from WS291
+# Preparation With Mappings from WS291  
 require(GenomicFeatures)
 worm_gtf <- makeTxDbFromGFF("./datasets/celegans_spike.gtf", "gtf")
 tx2gene_worm <- AnnotationDbi::select(worm_gtf, keys(worm_gtf, keytype = "TXNAME"), "GENEID", "TXNAME")
