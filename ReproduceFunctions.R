@@ -78,6 +78,56 @@ OLD_LABEL_2_NEW <- c(
   "F4" = "-4"
 )
 
+
+
+
+CONDITIONS_NAMES <- c('S1', 
+                      'S2', 
+                      'S3', 
+                      'S4', 
+                      '-4',
+                      '-3', 
+                      '-2-3',
+                      '-2',
+                      '-1',
+                      'P0',
+                      '-2S4',
+                      'S2S3',
+                      '-3S4',
+                      '-2-3S4',
+                      'Unknown',
+                      
+                      "2-cell",
+                      "4-cell",
+                      "8-cell",
+                      "16-cell")
+
+names(CONDITIONS_NAMES) <- c('S1', 
+'S2', 
+
+'S3', 
+'S4', 
+
+'-4',
+'-3', 
+'-2-3',
+'-2',
+'-1',
+
+'P0',
+'-2S4',
+'S2S3',
+'-3S4',
+'-2-3S4',
+'Unknown',
+
+"2-cell",
+      "4-cell",
+      "8-cell",
+"16-cell")
+
+
+
 read_expression <- function(dir, mode = "salmon", tx2gene = NULL) {
   if (mode %in% c("star", "hisat")) {
     files <- list.files(dir, pattern = paste(mode, "htseq.ct", sep = "."), full.names = T)
@@ -1268,6 +1318,15 @@ test_plot <- function() {
   plot_top_diff_genes(ce.ct, genes = c("ced-8"), plot_type = "diagram", ncols = 1)
   dev.off()
 }
+
+
+dispersionSubset <- function(cds){
+  disp_table <- dispersionTable(estimateDispersions(cds))
+  unsup_clustering_genes <- subset(disp_table, mean_expression >= 0.1)
+  cds <- setOrderingFilter(cds, unsup_clustering_genes$gene_id)
+  return(cds)
+}
+
 
 # Install and load reshape2 package
 install.packages("reshape2")

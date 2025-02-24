@@ -525,7 +525,7 @@ num_summary <- data.frame(
   summarise(Num_of_Genes = mean(num_of_Genes), sd_num = sd(num_of_Genes), Batch = unique(Batch))
 
 num_summary %>%
-  mutate(cellType = factor(cellType, levels = c("S1", "S2", "S3", "S4", "F3", "F2", "F1", "P0"))) %>%
+  mutate(cellType = factor(cellType, levels = c("S1", "S2", "S3", "S4", "-3", "-2", "-1", "P0"))) %>%
   ggplot(aes(Batch, Num_of_Genes, fill = cellType)) +
   geom_bar(stat = "identity", color = "black", position = position_dodge()) +
   geom_errorbar(aes(ymin = Num_of_Genes - sd_num, ymax = Num_of_Genes + sd_num), color = "black", width = 0.2, position = position_dodge(.9)) +
@@ -537,7 +537,7 @@ ggsave("number_gene_expressed.png", width = 3, height = 2.5)
 
 
 num_summary %>%
-  mutate(cellType = factor(cellType, levels = c("S1", "S2", "S3", "S4", "F3", "F2", "F1", "P0"))) %>%
+  mutate(cellType = factor(cellType, levels = c("S1", "S2", "S3", "S4", "-3", "-2", "-1", "P0"))) %>%
   ggplot(aes(x = cellType, group = Batch, y = Num_of_Genes, shape = Batch, linetype = Batch, color = Batch)) +
   geom_line(linewidth = 0.8, position = position_dodge(0.2)) +
   geom_errorbar(aes(ymin = Num_of_Genes - sd_num, ymax = Num_of_Genes + sd_num), width = 0.6, position = position_dodge(0.2)) +
@@ -617,14 +617,14 @@ test01_fast_ora_up <- lapply(test01_fast, FUN = function(x) {
   gse_list <- x$Log2FC_shrunk # effect*log(2))*(-log10(test01_S2_S3$S2_S3$pval))
   names(gse_list) <- row.names(x)
   gse_list <- sort(gse_list, T)
-  gse_res <- enrich_CP(row.names(subset(x, qval < 0.05 & Log2FC_shrunk >= log2(1.5))), "celegans", universe = deg_universe, logFC = gse_list, GSE = F)
+  gse_res <- enrich_CP(row.names(subset(x, qval < 0.05 & Log2FC_shrunk >= log2(1.5))), "celegans", universe = row.names(x), logFC = gse_list, GSE = F)
 })
 
 test01_fast_ora_down <- lapply(test01_fast, FUN = function(x) {
   gse_list <- x$Log2FC_shrunk # effect*log(2))*(-log10(test01_S2_S3$S2_S3$pval))
   names(gse_list) <- row.names(x)
   gse_list <- sort(gse_list, T)
-  gse_res <- enrich_CP(row.names(subset(x, qval < 0.05 & Log2FC_shrunk <= -log2(1.5))), "celegans", universe = deg_universe, logFC = gse_list, GSE = F)
+  gse_res <- enrich_CP(row.names(subset(x, qval < 0.05 & Log2FC_shrunk <= -log2(1.5))), "celegans", universe = row.names(x), logFC = gse_list, GSE = F)
 })
 
 # Gene Heatmap
@@ -638,7 +638,9 @@ all_degs <- unique(do.call(c, lapply(test01_fast, FUN = function(x) {
 
 deg_universe <- unique(do.call(c, lapply(test01_fast, row.names)))
 
-test_hmap <- addTermsHeatmap(exprs(ce.ct), all_degs, as.data.frame(pData(ce.ct)),
+ce.ct.meta <- as.data.frame(pData(ce.ct))
+ce.ct.meta$cellType <- factor(ce.ct.meta$cellType, levels = STAGE_ORDER)
+test_hmap <- addTermsHeatmap(exprs(ce.ct), all_degs, ce.ct.meta,
   exprs_mat = NULL,
   dist_row = "pearson",
   dist_col = "euclidean",
@@ -646,7 +648,7 @@ test_hmap <- addTermsHeatmap(exprs(ce.ct), all_degs, as.data.frame(pData(ce.ct))
   org = "celegans",
   k = 20,
   universe = deg_universe, scale_minmax = T,
-  plot = "./test_hmap_full.png", no_log = F,
+  plot = "./test_hmap_full0.png", no_log = F,
   tpm = F
 )
 
@@ -752,12 +754,12 @@ write.csv(GSEA_single_table, file = "Supplementary Table S5.csv", quote = F, row
 rb_genes <- row.names(subset(WORM.GENES, !grepl(regex("trp|hrp|nrp"), Public.Name) & grepl(regex("rps|rpl|rla"), Public.Name)))
 rb_genes <- intersect(row.names(exprs(ce.ct)), rb_genes)
 rb_exprs <- data.frame(t(exprs(ce.ct)[rb_genes, ]) / sizeFactors(ce.ct))
-rb_exprs$cellType <- factor(pData(ce.ct)$cellType, levels = c("S1", "S2", "S3", "S4", "F3", "F2", "F1", "P0"))
+rb_exprs$cellType <- factor(pData(ce.ct)$cellType, levels = c("S1", "S2", "S3", "S4", "-3", "-2", "-1", "P0"))
 rb_exprs$geneID <- subset(WORM.GENES, !grepl(regex("trp|hrp|nrp"), Public.Name) & grepl(regex("rps|rpl|rla"), Public.Name))[, "Public.Name"]
 rb_exprs %>%
   melt(id.vars = "cellType") %>%
   ggplot(mapping = aes(fill = cellType, x = cellType, y = log10(value + 1))) +
-  geom_boxplot() +
+  geom_violin() +
   theme_classic() +
   scale_fill_manual(values = DOT_COLOR) +
   ylab("log10 NormalizedExprs") +
@@ -771,6 +773,10 @@ png("test_2.png", width = 2.2, height = 4.8, units = "in", res = 300, type = "ca
 plot_top_diff_genes(ce.ct, genes = c("ced-8"), plot_type = "diagram", ncols = 1)
 dev.off()
 
+## gene diagrams 
+png('mlc-7.png', width = 2.2, height = 4.8, units = 'in', res= 300, type = 'cairo')
+plot_top_diff_genes(ce.ct, diff_res = test01_fast, genes = c("ced-8"), plot_type = 'diagram', ncols = 1)
+dev.off()
 
 
 
