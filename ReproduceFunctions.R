@@ -320,17 +320,20 @@ prepareMonocle <- function(exprs, meta, features, tpm2abs = T, ct2tpm = F, monoc
 }
 
 
+# functions for producing heatmaps with enriched go terms (results from clusterprofiler) using complexheatmap
+
+## actual function plotting heatmaps with complexheatmap
+## the cds here is the matrix that will be used for clustering
+## the exprs_mat is the matrix that will be used for viaulization
 geneHeatmap <- function(cds, exprs_mat, tpm = F,
                         genes = NULL, clusterGenes = T,
                         dist_row = "pearson", dist_col = "euclidean",
                         main = "Gene Expression Heatmap",
                         fontsize = 5, legend = T, row_color = NULL,
                         annotations, clust_n = 30, mmethod = "ward.D2") {
-  stages <- c("S1", "S2", "S3", "S4", "F4", "F3", "F2", "F2F3", "F2S4", "F3S4", "F1", "P0", "Unknown")
   cluster_mat <- cds
-
   if (!is.null(genes)) {
-    mat <- mat[genes, order(match(annotations$cellType, stages))]
+    mat <- mat[genes, ]
   }
   DISTMETHOD_row <- dist_row
   DISTMETHOD_col <- dist_col
@@ -341,10 +344,10 @@ geneHeatmap <- function(cds, exprs_mat, tpm = F,
     if (DISTMETHOD_col %in% c("pearson", "spearman", "kandall", "cosine", "mcd", "ogk")) {
       # mat <- df
       require(MKmisc)
-
+      
       cdist <- corDist(t(cluster_mat)[rownames(df), ], method = DISTMETHOD_col)
       # cdist <- quickWGCNA_dist(cluster_mat[,row.names(df)])
-
+      
       # print("calculating correlation distance")
     } else {
       cdist <- dist(t(cluster_mat)[rownames(df), ], method = DISTMETHOD_col)
@@ -392,7 +395,7 @@ geneHeatmap <- function(cds, exprs_mat, tpm = F,
   } else {
     show_rown <- T
   }
-
+  
   annotations <- annotations[, "cellType", drop = F]
   if (!is.null(row_color)) {
     # logfc <- c("FALSE" = 'negative', 'TRUE' = 'positive')[as.character(row_color > 0)]
@@ -462,9 +465,9 @@ geneHeatmap <- function(cds, exprs_mat, tpm = F,
       col = list(cellType = DOT_COLOR)
     ),
     bottom_annotation = HeatmapAnnotation(cellType = anno_text(colnames(cds),
-      rot = 270,
-      gp = gpar(fontsize = 4), location = 0.5,
-      just = "center"
+                                                               rot = 270,
+                                                               gp = gpar(fontsize = 4), location = 0.5,
+                                                               just = "center"
     ), which = c("column")),
     left_annotation = NULL,
     right_annotation = NULL,
@@ -489,10 +492,7 @@ geneHeatmap <- function(cds, exprs_mat, tpm = F,
   return(heat_obj)
 }
 
-
-
-
-
+# main function to draw heatmap for all differntially exxpressed genes, each gene's exprssion is in rows and columns are ordered by cellType
 addTermsHeatmap <- function(cds, genes, meta,
                             exprs_mat = NULL,
                             dist_row = "pearson",
@@ -535,19 +535,19 @@ addTermsHeatmap <- function(cds, genes, meta,
       }
     }
   }
-
+  
   mat <- ct[genes, ]
   exprs_mat <- exprs_mat[genes, ]
-  meta$cellType <- factor(meta$cellType, levels = STAGE_ORDER)
+  
   anno <- meta[, "cellType", drop = F]
-
+  
   if (is.null(hmap_obj)) {
     hmap_obj <- geneHeatmap(mat, exprs_mat = exprs_mat, annotations = anno, tpm = tpm, dist_row = dist_row, dist_col = dist_col, clust_n = 2)
     return(hmap_obj)
   } else {
     hmap_obj <- geneHeatmap(mat, exprs_mat = exprs_mat, annotations = anno, tpm = tpm, dist_col = dist_col, dist_row = dist_row, clust_n = k)
   }
-
+  
   hm_order <- row_order(draw(hmap_obj))
   clust_l <- rep(0, length(genes))
   names(clust_l) <- 1:length(genes)
@@ -558,7 +558,7 @@ addTermsHeatmap <- function(cds, genes, meta,
     genes[hm_order[[x]]]
   })
   names(genes_clust) <- 1:length(hm_order)
-
+  
   gene_terms <- lapply(1:length(hm_order), FUN = function(x) {
     sig_terms <- enrich_CP(genes[hm_order[[x]]], organisms = org, universe = universe, logFC = NULL, GSE = F, GO_BP_only = T)
   })
@@ -585,7 +585,6 @@ addTermsHeatmap <- function(cds, genes, meta,
   if (length(intersect(names(clust_l), names(test_gene_terms))) == 0) {
     return(hmap_obj)
   }
-  print(test_gene_terms)
   heatmap_obj <- hmap_obj + rowAnnotation(textbox = anno_textbox(clust_l, test_gene_terms, gp = gpar(fontsize = 11), word_wrap = T, text_space = unit(10, "pt"), max_width = unit(70, "mm")))
   if (plot != F) {
     png(file = plot, res = 300, width = 10, height = 10, units = "in")
@@ -595,6 +594,15 @@ addTermsHeatmap <- function(cds, genes, meta,
   list(hmap = heatmap_obj, clust = genes_clust, enriched = gene_terms)
 }
 
+all_degs <- unique(do.call(c, lapply(deg_result_list, FUN = function(x) {
+  row.names(subset(x, qval < 0.05 & abs(Log2FC_shrunk) >= log2(1.5)))
+})))
+
+
+
+
+
+# scale down expression for each gene to between 0 and 1
 scale_down <- function(m, min_v = 0, max_v = 1) {
   new_m <- t(apply(m, 1, FUN = function(x) {
     x <- (x - min(x)) * (max_v - min_v) / (max(x) - min(x)) + min_v
@@ -603,6 +611,10 @@ scale_down <- function(m, min_v = 0, max_v = 1) {
   colnames(new_m) <- colnames(m)
   return(new_m)
 }
+
+
+
+
 
 
 sample_PCA <- function(cds, meta,
@@ -1085,14 +1097,22 @@ diff_test_helper <- function(x,
   test_res
 }
 
+# functions for producing gene differential expression diagrams of celegans gonad for any gene
+##This requires a monocle2 object cds and monocle2 differential expression results for each neighboring segment of gonad in a list
+
+### Main function to plot gene expression 
+# plot_type = diagram will give custom gene diagrams made with svg images of worm gonad structure
+# diff_res argument takes a list of monocle differential expression result dataframes for neighboring segment comparisons
+# genes is a list of genes that will be plotted
+# ncols is number of gene diagrams per row that is plotted in a single image
+# save_diagram if is string given will save to file by name of string
 plot_top_diff_genes <- function(cds,
-                                diff_res = NULL,
                                 genes = NULL,
                                 num_genes = 20,
                                 compare = NULL,
                                 color_by = "cellType",
-                                plot_type = c("trajectory", "jitter", "violin", "bar", "diagram"),
-                                grouping = "stage", ncols = 5, sep_plots = F, sep_plots_path = NULL) {
+                                plot_type = c("trajectory", "jitter", "violin", "bar", "diagram"), diff_res = NULL,
+                                grouping = "stage", ncols = 5, sep_plots = F, sep_plots_path = NULL, save_diagram = T) {
   theme0 <- theme_bw() + theme(
     plot.title = element_text(hjust = 0.5, size = 26), panel.border = element_blank(), panel.grid.major = element_blank(),
     panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"), axis.text.y = element_text(size = 18),
@@ -1109,13 +1129,24 @@ plot_top_diff_genes <- function(cds,
   } else {
     cds_subset <- cds[fData(cds)$gene_short_name %in% genes, ]
   }
-  if (!is.null(diff_res)) {
-    diff_sig <- check_diff(row.names(fData(cds_subset)), diff_res)
-  } else {
-    diff_sig <- NULL
-  }
+  
   if (plot_type == "diagram") {
+    if (!is.null(diff_res)) {
+      diff_sig <- check_diff(row.names(fData(cds_subset)), diff_res)
+    } else {
+      diff_sig <- NULL
+    }
     q <- plot_genes_diagram(cds_subset, "cellType", ncols = ncols, sep_plots = sep_plots, sep_plots_path = sep_plots_path, diff_sig = diff_sig)
+    if(is.character(save_diagram)){
+      if(!endsWith(save_diagram, 'png')){
+        save_diagram <- paste(save_diagram, '.png', sep = '')
+      }
+      width = ncols*2.2
+      height = ceiling(nrow(cds_subset)/ncols)*4.8
+      png(save_diagram, width = width, height = height, units = 'in', res= 300, type = 'cairo')
+      print(q)
+      dev.off()
+    }
     return(q)
   }
   if (plot_type == "bar") {
@@ -1135,7 +1166,7 @@ plot_top_diff_genes <- function(cds,
   q
 }
 
-
+# actual function to plot the diagrams
 plot_genes_diagram <- function(cds, color_by = color_by, single_scale = F, ncols = 5, sep_plots = F, sep_plots_path = NULL, diff_sig = NULL) {
   average_exprs_group <- do.call(rbind, lapply(row.names(fData(cds)), function(g) {
     tapply(row.names(pData(cds)), pData(cds)[, color_by], function(c) {
@@ -1143,10 +1174,10 @@ plot_genes_diagram <- function(cds, color_by = color_by, single_scale = F, ncols
     })
   }))
   row.names(average_exprs_group) <- row.names(fData(cds))
-
+  
   svg <- grImport2::readPicture("./diagram_cairo.svg")
   # nam_content <- list('S1' = c(1), 'S2' = c(2), 'S3' = c(3), 'S4' = c(9, 10, 11, 8), '-3' = c(5), '-2'= c(6), '-1' = c(7), 'P0' = c(26))
-
+  
   nam_content <- list("S1" = c(1), "S2" = c(3), "S3" = c(5), "S4" = c(17, 19, 15, 21), "-3" = c(9), "-2" = c(11), "-1" = c(13), "P0" = c(37))
   # nam_content <- list('S1' = c(1), 'S2' = c(2), 'S3' = c(3), 'S4' = c(8,9,10,11), 'F3' = c(5), 'F2'= c(6), 'F1' = c(7), 'P0' = c(19))
   grob_list <- list()
@@ -1156,7 +1187,7 @@ plot_genes_diagram <- function(cds, color_by = color_by, single_scale = F, ncols
     rang <- c(floor(min(average_exprs_group[g, ])), max(max(average_exprs_group[g, ]), floor(min(average_exprs_group[g, ])) + 2))
     # print(rang)
     ii <- cut(average_exprs_group[g, ], breaks = seq(floor(rang[1]), ceiling(rang[2]), len = 100), include.lowest = TRUE)
-
+    
     cols <- colorRampPalette(brewer.pal(9, "Reds"))(100)[ii]
     # print(ii)
     names(cols) <- colnames(average_exprs_group)
@@ -1179,16 +1210,17 @@ plot_genes_diagram <- function(cds, color_by = color_by, single_scale = F, ncols
     }
     # gg <- packGrob(packGrob(packGrob(frameGrob(), pictureGrob(new_svg, width = 0.8, height = 1.5)), err.bar, width = unit(0.2, 'null'), side = 'left'),
     #              legd, height=unit(1,"null"), width = unit(0.45, 'null'), side="right")
-
+    
     gg <- packGrob(packGrob(packGrob(frameGrob(), pictureGrob(new_svg, width = 0.6, height = 1.2)), err.bar, width = unit(0.1, "null"), side = "right"),
-      legd,
-      height = unit(1, "null"), side = "right", width = unit(0.9, "null")
+                   legd,
+                   height = unit(1, "null"), side = "right", width = unit(0.9, "null")
     )
     grob_list[[g]] <- gg
   }
   cowplot::plot_grid(plotlist = grob_list, ncol = ncols)
 }
 
+# check which comparisons are actually significant and to what degree
 check_diff <- function(gene, res) {
   chk <- lapply(gene, function(x) {
     sapply(res, function(r) {
@@ -1211,7 +1243,7 @@ check_diff <- function(gene, res) {
 
 
 
-
+# color bar for expression level
 color.bar <- function(lut, min, max = -min, nticks = 5, ticks = seq(min, max, len = nticks), title = "", sub_title = "") {
   scale <- (length(lut) - 1) / (max - min)
   par(mar = c(12, 14, 12, 1))
@@ -1220,7 +1252,7 @@ color.bar <- function(lut, min, max = -min, nticks = 5, ticks = seq(min, max, le
   axis(2, ticks, las = 1, font = 2)
   for (i in 1:(length(lut) - 1)) {
     y <- (i - 1) / scale + min
-
+    
     rect(0, y, 4, y + 1 / scale, col = lut[i], border = NA)
   }
   mtext(bquote(bolditalic(.(sub_title))), cex = 1.7, side = 3, padj = -0.5, at = -2, adj = 0.5, font = 2)
@@ -1229,7 +1261,8 @@ color.bar <- function(lut, min, max = -min, nticks = 5, ticks = seq(min, max, le
 
 
 
-
+# drawing error bars for comparisons that are significant
+# technically not error bars but are actually significance level indicators
 error.bar <- function(all) {
   p <- plot(c(16, 25), c(0, 10), type = "n", bty = "n", xaxt = "n", xlab = "", yaxt = "n", ylab = "")
   brac_l <- 3.5
@@ -1241,7 +1274,7 @@ error.bar <- function(all) {
     segments(x - brac_l, y[2], x, y[2], lwd = 2.3)
     text(x, y = mean(y), labels = all["F1_P0"], srt = 90, adj = c(0.5, 1.5))
   }
-
+  
   if (!is.na(all["F2_F1"])) {
     x <- -10
     y <- c(0.6, 1.4)

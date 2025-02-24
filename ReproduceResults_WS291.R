@@ -1,5 +1,4 @@
 # Preparation With Mappings from WS291  
-require(GenomicFeatures)
 worm_gtf <- makeTxDbFromGFF("./datasets/celegans_spike.gtf", "gtf")
 tx2gene_worm <- AnnotationDbi::select(worm_gtf, keys(worm_gtf, keytype = "TXNAME"), "GENEID", "TXNAME")
 write.table(tx2gene_worm, "./worm_tx2gene.tsv", sep = "\t", quote = F)
@@ -197,7 +196,7 @@ stress <- row.names(subset(cengen_stress, !is.na(Brunquell_source)))
 
 
 # stress <- union(row.names(subset(cengen_stress, !is.na(Brunquell_source))),row.names(subset(WORM.GENES, grepl('hsp', Public.Name) | grepl('col', Public.Name) | grepl('clec', Public.Name))))
-test_hmap_stress <- addTermsHeatmap(combined$tpm, stress, combined$meta,
+stress_hmap <- addTermsHeatmap(combined$tpm, stress, combined$meta,
   exprs_mat = NULL,
   dist_row = "pearson",
   dist_col = "euclidean",
@@ -205,7 +204,7 @@ test_hmap_stress <- addTermsHeatmap(combined$tpm, stress, combined$meta,
   org = "celegans",
   k = 5,
   universe = NULL, scale_minmax = F,
-  plot = "./test_hmap_stress.png",
+  plot = "./stress_hmap.png",
   tpm = T
 )
 
@@ -213,7 +212,7 @@ test_hmap_stress <- addTermsHeatmap(combined$tpm, stress, combined$meta,
 
 # cengen_stress_cuticle <- intersect(row.names(combined$tpm), row.names(cengen_stress[grepl('col-',cengen_stress$Gene_name),]))
 # cengen_stress_cuticle <- intersect(row.names(combined$tpm) , row.names(subset(WORM.GENES, grepl('hsp', Public.Name) | grepl('col', Public.Name) | grepl('clec', Public.Name))))
-cengen_stress_cuticle <- test_hmap_stress$clust[[1]]
+cengen_stress_cuticle <- stress_hmap$clust[[1]]
 
 
 genes_stress <- t(cor(t(as.matrix(combined$tpm)[cengen_stress_cuticle, ]), t(as.matrix(combined$tpm))))
@@ -556,72 +555,42 @@ splicing_meta$reads_over_splice_rate <- splicing_meta$reads_splice_known_loci / 
 write.table(splicing_meta, "WS291_filtered_splicing.meta.tsv", quote = F, sep = "\t")
 
 
-test_01 <- ce.ct
-sizeFactors(test_01) <- estimateSizeFactorsForMatrix(exprs(test_01))
-test_01 <- estimateDispersions(test_01)
+ce.cds <- ce.ct
+sizeFactors(ce.cds) <- estimateSizeFactorsForMatrix(exprs(ce.cds))
+ce.cds <- estimateDispersions(ce.cds)
 
-test01_fast <- list(
-  S1_S2 = monocle_diff(test_01, subtype = c("S1", "S2"), full_formula = "~cellType+num_genes_expressed+experiment", reduced_formula = "~num_genes_expressed+experiment", apeglm_method = "nbinomC"),
-  S2_S3 = monocle_diff(test_01, subtype = c("S2", "S3"), full_formula = "~cellType+num_genes_expressed+experiment", reduced_formula = "~num_genes_expressed+experiment", apeglm_method = "nbinomC"),
-  S3_S4 = monocle_diff(test_01, subtype = c("S3", "S4"), full_formula = "~cellType+num_genes_expressed+experiment", reduced_formula = "~num_genes_expressed+experiment", apeglm_method = "nbinomC"),
-  S4_F3 = monocle_diff(test_01, subtype = c("S4", "-3"), full_formula = "~cellType+num_genes_expressed+experiment", reduced_formula = "~num_genes_expressed+experiment", apeglm_method = "nbinomC"),
-  F3_F2 = monocle_diff(test_01, subtype = c("-3", "-2"), full_formula = "~cellType+num_genes_expressed+experiment", reduced_formula = "~num_genes_expressed+experiment", apeglm_method = "nbinomC"),
-  F2_F1 = monocle_diff(test_01, subtype = c("-2", "-1"), full_formula = "~cellType+num_genes_expressed+experiment", reduced_formula = "~num_genes_expressed+experiment", apeglm_method = "nbinomC"),
-  F1_P0 = monocle_diff(test_01, subtype = c("-1", "P0"), full_formula = "~cellType+num_genes_expressed+experiment", reduced_formula = "~num_genes_expressed+experiment", apeglm_method = "nbinomC")
+ce_deg_results <- list(
+  S1_S2 = monocle_diff(ce.cds, subtype = c("S1", "S2"), full_formula = "~cellType+num_genes_expressed+experiment", reduced_formula = "~num_genes_expressed+experiment", apeglm_method = "nbinomC"),
+  S2_S3 = monocle_diff(ce.cds, subtype = c("S2", "S3"), full_formula = "~cellType+num_genes_expressed+experiment", reduced_formula = "~num_genes_expressed+experiment", apeglm_method = "nbinomC"),
+  S3_S4 = monocle_diff(ce.cds, subtype = c("S3", "S4"), full_formula = "~cellType+num_genes_expressed+experiment", reduced_formula = "~num_genes_expressed+experiment", apeglm_method = "nbinomC"),
+  S4_F3 = monocle_diff(ce.cds, subtype = c("S4", "-3"), full_formula = "~cellType+num_genes_expressed+experiment", reduced_formula = "~num_genes_expressed+experiment", apeglm_method = "nbinomC"),
+  F3_F2 = monocle_diff(ce.cds, subtype = c("-3", "-2"), full_formula = "~cellType+num_genes_expressed+experiment", reduced_formula = "~num_genes_expressed+experiment", apeglm_method = "nbinomC"),
+  F2_F1 = monocle_diff(ce.cds, subtype = c("-2", "-1"), full_formula = "~cellType+num_genes_expressed+experiment", reduced_formula = "~num_genes_expressed+experiment", apeglm_method = "nbinomC"),
+  F1_P0 = monocle_diff(ce.cds, subtype = c("-1", "P0"), full_formula = "~cellType+num_genes_expressed+experiment", reduced_formula = "~num_genes_expressed+experiment", apeglm_method = "nbinomC")
 )
 
-sapply(test01_fast, function(x) {
+sapply(ce_deg_results, function(x) {
   c(nrow(subset(x, qval < 0.05 & Log2FC_shrunk > log2(1.5))), nrow(subset(x, qval < 0.05 & Log2FC_shrunk < -log2(1.5))))
 })
 
 
-test01_fast_ora <- lapply(test01_fast, FUN = function(x) {
-  gse_list <- x$Log2FC_shrunk # effect*log(2))*(-log10(test01_S2_S3$S2_S3$pval))
-  names(gse_list) <- row.names(x)
-  gse_list <- sort(gse_list, T)
-  gse_res <- enrich_CP(row.names(subset(x, qval < 0.05 & Log2FC_shrunk >= log2(1.5))), "celegans", universe = row.names(x), logFC = gse_list, GSE = T, gsea_qval = 1.01)
-})
 
-
-aggregate_gse <- lapply(names(test01_fast_ora), FUN = function(nn) {
-  x <- test01_fast_ora[[nn]]
-  df <- do.call(rbind, lapply(names(x), FUN = function(n) {
-    if (!grepl("gse", n) | grepl("MF", n) | grepl("CC", n)) {
-      return(NULL)
-    }
-    sub_df <- x[[n]]@result
-    sub_df[, "Gene Set Type"] <- c("GO_BP_gse" = "GO Biological Process", "KEGG_gse" = "KEGG", "REACT_gse" = "Reactome", "WKP_gse" = "Wikipathway")[n]
-    sub_df$Description <- gsub(",", " ", sub_df$Description)
-    sub_df$leading_edge <- gsub(",", "|", sub_df$leading_edge)
-    sub_df
-  }))
-  # write.csv(subset(df, qvalue < 0.05), paste(nn, '_gsea.csv', sep = ''), quote = F, row.names = F)
-  # df$qvalue <- qvalue(df$pvalue)$qvalue
-  # df$p.adjust <- p.adjust(df$pvalue)
-
-  # obj <- x$GO_BP_gse
-  # obj@result <- subset(df, qvalue < 0.05)
-  # obj@params$pvalueCutoff <- 0.05
-  # obj
-})
-names(aggregate_gse) <- names(test01_fast_ora)
-
-test01_fast_gse <- lapply(test01_fast, FUN = function(x) {
-  gse_list <- x$Log2FC_shrunk # effect*log(2))*(-log10(test01_S2_S3$S2_S3$pval))
+ce_deg_results_gse <- lapply(ce_deg_results, FUN = function(x) {
+  gse_list <- x$Log2FC_shrunk 
   names(gse_list) <- row.names(x)
   gse_list <- sort(gse_list, T)
   gse_res <- enrich_CP(row.names(subset(x, qval < 0.05 & Log2FC_shrunk >= log2(1.5))), "celegans", universe = row.names(x), logFC = gse_list, GSE = T)
 })
 
-test01_fast_ora_up <- lapply(test01_fast, FUN = function(x) {
-  gse_list <- x$Log2FC_shrunk # effect*log(2))*(-log10(test01_S2_S3$S2_S3$pval))
+ce_deg_results_ora_up <- lapply(ce_deg_results, FUN = function(x) {
+  gse_list <- x$Log2FC_shrunk 
   names(gse_list) <- row.names(x)
   gse_list <- sort(gse_list, T)
   gse_res <- enrich_CP(row.names(subset(x, qval < 0.05 & Log2FC_shrunk >= log2(1.5))), "celegans", universe = row.names(x), logFC = gse_list, GSE = F)
 })
 
-test01_fast_ora_down <- lapply(test01_fast, FUN = function(x) {
-  gse_list <- x$Log2FC_shrunk # effect*log(2))*(-log10(test01_S2_S3$S2_S3$pval))
+ce_deg_results_ora_down <- lapply(ce_deg_results, FUN = function(x) {
+  gse_list <- x$Log2FC_shrunk 
   names(gse_list) <- row.names(x)
   gse_list <- sort(gse_list, T)
   gse_res <- enrich_CP(row.names(subset(x, qval < 0.05 & Log2FC_shrunk <= -log2(1.5))), "celegans", universe = row.names(x), logFC = gse_list, GSE = F)
@@ -632,37 +601,37 @@ test01_fast_ora_down <- lapply(test01_fast, FUN = function(x) {
 # DESeq vst normalize -> pearson correlation distance -> wardD2 (WGCNA doesn't work as well, not a lot of enrichment) -> 20 clusters
 # Enrichment GO biological process, qval < 0.05 or pvalue < 0.001
 
-all_degs <- unique(do.call(c, lapply(test01_fast, FUN = function(x) {
+# actual analysis commands to produce the Figure 1 starting from ce.ct monocle object and deg_result_list listof deg results
+all_degs <- unique(do.call(c, lapply(ce_deg_results, FUN = function(x) {
   row.names(subset(x, qval < 0.05 & abs(Log2FC_shrunk) >= log2(1.5)))
 })))
-
-deg_universe <- unique(do.call(c, lapply(test01_fast, row.names)))
-
+deg_universe <- unique(do.call(c, lapply(deg_result_list, row.names)))
 ce.ct.meta <- as.data.frame(pData(ce.ct))
 ce.ct.meta$cellType <- factor(ce.ct.meta$cellType, levels = STAGE_ORDER)
-test_hmap <- addTermsHeatmap(exprs(ce.ct), all_degs, ce.ct.meta,
-  exprs_mat = NULL,
-  dist_row = "pearson",
-  dist_col = "euclidean",
-  hmap_obj = "lkl",
-  org = "celegans",
-  k = 20,
-  universe = deg_universe, scale_minmax = T,
-  plot = "./test_hmap_full0.png", no_log = F,
-  tpm = F
+deg_hmap <- addTermsHeatmap(exprs(ce.ct), all_degs, ce.ct.meta,
+                             exprs_mat = NULL,
+                             dist_row = "pearson",
+                             dist_col = "euclidean",
+                             hmap_obj = "lkl",
+                             org = "celegans",
+                             k = 20,
+                             universe = deg_universe, scale_minmax = T,
+                             plot = "./deg_hmap_full.png", no_log = F,
+                             tpm = F
 )
 
 
-genes_from_spermacae <- intersect(row.names(subset(test01_fast$F2_F1[row.names(subset(test01_fast$F1_P0, qval < 0.05 & Log2FC_shrunk < -7)), ], qval < 0.05 & Log2FC_shrunk > 4)), row.names(ce.ct)[rowMeans(t(t(exprs(ce.ct)) / sizeFactors(ce.ct))[, ce.ct$cellType == "F1"]) > 1000])
+
+genes_from_spermacae <- intersect(row.names(subset(ce_deg_results$F2_F1[row.names(subset(ce_deg_results$F1_P0, qval < 0.05 & Log2FC_shrunk < -7)), ], qval < 0.05 & Log2FC_shrunk > 4)), row.names(ce.ct)[rowMeans(t(t(exprs(ce.ct)) / sizeFactors(ce.ct))[, ce.ct$cellType == "F1"]) > 1000])
 View(WORM.GENES[genes_from_spermacae, ])
 
 
 
 
 # F1_v_P0 histogram plot
-logfc_in_other_comps <- data.frame(do.call(rbind, lapply(names(test01_fast)[1:6], function(n) {
-  x <- test01_fast[[n]]
-  F1_P0 <- row.names(subset(test01_fast$F1_P0, Log2FC_shrunk < -log2(1.5) & qval < 0.05))
+logfc_in_other_comps <- data.frame(do.call(rbind, lapply(names(ce_deg_results)[1:6], function(n) {
+  x <- ce_deg_results[[n]]
+  F1_P0 <- row.names(subset(ce_deg_results$F1_P0, Log2FC_shrunk < -log2(1.5) & qval < 0.05))
   logfc <- x[intersect(row.names(x), F1_P0), ]$Log2FC_shrunk
   df <- data.frame(comparison = rep(paste(strsplit(n, "_")[[1]], collapse = "_v_"), length(logfc)), Log2FC = logfc)
   return(df)
@@ -676,9 +645,9 @@ ggplot(logfc_in_other_comps, mapping = aes(x = Log2FC, fill = comparison)) +
   scale_fill_viridis_d() +
   geom_vline(xintercept = 4, color = "red", linetype = "dashed")
 ggsave("./F1_P0_down_degs_in_F2_F1.png", height = 3, width = 3)
-change_in_other_comps <- data.frame(do.call(rbind, lapply(names(test01_fast)[1:6], function(n) {
-  x <- test01_fast[[n]]
-  F1_P0 <- row.names(subset(test01_fast$F1_P0, Log2FC_shrunk < -log2(1.5) & qval < 0.05))
+change_in_other_comps <- data.frame(do.call(rbind, lapply(names(ce_deg_results)[1:6], function(n) {
+  x <- ce_deg_results[[n]]
+  F1_P0 <- row.names(subset(ce_deg_results$F1_P0, Log2FC_shrunk < -log2(1.5) & qval < 0.05))
 
   logfc_up <- sum(x[intersect(row.names(x), F1_P0), ]$Log2FC_shrunk > log2(1.5))
   logfc_uup <- sum(x[intersect(row.names(x), F1_P0), ]$Log2FC_shrunk > log2(4))
@@ -730,14 +699,14 @@ filter_genes_single_table <- rbind(
 
 write.csv(subset(filter_genes_single_table, !is.na(WormBase.Gene.ID)), file = "Supplementary Table 2 v1.csv", quote = F, row.names = F)
 
-DEG_single_table <- do.call(rbind, lapply(names(test01_fast), FUN = function(x) {
-  sub_df <- test01_fast[[x]][, c(5, 6, 3, 4, 17)]
+DEG_single_table <- do.call(rbind, lapply(names(ce_deg_results), FUN = function(x) {
+  sub_df <- ce_deg_results[[x]][, c(5, 6, 3, 4, 17)]
   df <- data.frame("Stages Tested" = rep(paste(strsplit(x, "_")[[1]], collapse = " vs "), nrow(sub_df)), sub_df)
 }))
 write.csv(DEG_single_table, file = "Supplementary Table S3.csv", quote = F, row.names = F)
 
-hmap_single_table <- do.call(rbind, lapply(1:length(test_hmap$clust), FUN = function(x) {
-  sub_df <- test_hmap$clust[[x]]
+hmap_single_table <- do.call(rbind, lapply(1:length(deg_hmap$clust), FUN = function(x) {
+  sub_df <- deg_hmap$clust[[x]]
   df <- data.frame("Wormbase.ID" = sub_df, "Public.Name" = WORM.GENES[sub_df, 2], "Gene Cluster" = x)
 }))
 write.csv(hmap_single_table, file = "Supplementary Table S4.csv", quote = F, row.names = F)
@@ -769,13 +738,10 @@ ggsave("ribosome_protein_gene.png", width = 6, height = 3)
 ### Draw Diagrams
 
 
-png("test_2.png", width = 2.2, height = 4.8, units = "in", res = 300, type = "cairo")
-plot_top_diff_genes(ce.ct, genes = c("ced-8"), plot_type = "diagram", ncols = 1)
-dev.off()
 
 ## gene diagrams 
 png('mlc-7.png', width = 2.2, height = 4.8, units = 'in', res= 300, type = 'cairo')
-plot_top_diff_genes(ce.ct, diff_res = test01_fast, genes = c("ced-8"), plot_type = 'diagram', ncols = 1)
+plot_top_diff_genes(ce.ct, diff_res = ce_deg_results, genes = c("ced-8"), plot_type = 'diagram', ncols = 1)
 dev.off()
 
 
@@ -786,69 +752,69 @@ dev.off()
 # extreme 3'prime bias can distort statistics without good batch correction methods
 qorts_utr_stat <- read.csv("./datasets/custom_param_quant/multiqc_data/multiqc_qorts.txt", sep = "\t", row.names = 1)
 row.names(qorts_utr_stat) <- str_remove(row.names(qorts_utr_stat), "SRR3170")
-utr_file <- "./strict.txt"
-test_dapars <- read.csv(utr_file, sep = "\t", row.names = 1)
-test_dapars <- test_dapars[, -c(1:3)]
-test_dapars <- test_dapars[, grepl("long", colnames(test_dapars))]
-colnames(test_dapars) <- str_remove(colnames(test_dapars), ".depth_PDUI")
-colnames(test_dapars) <- str_remove(colnames(test_dapars), ".depth_long_exp")
-test_dapars_long <- test_dapars
-test_dapars <- read.csv(utr_file, sep = "\t", row.names = 1)
-test_dapars <- test_dapars[, -c(1:3)]
-test_dapars <- test_dapars[, grepl("short", colnames(test_dapars))]
-colnames(test_dapars) <- str_remove(colnames(test_dapars), ".depth_PDUI")
-colnames(test_dapars) <- str_remove(colnames(test_dapars), ".depth_short_exp")
-test_dapars_short <- test_dapars
-test_dapars <- read.csv(utr_file, sep = "\t", row.names = 1)
-test_dapars <- test_dapars[, -c(1:3)]
-test_dapars <- test_dapars[, grepl("PDUI", colnames(test_dapars))]
-colnames(test_dapars) <- str_remove(colnames(test_dapars), ".depth_PDUI")
-test_dapars_pdui <- test_dapars
-test_dapars_long <- test_dapars_long[rowSums(is.na(test_dapars_long)) == 0, ]
-test_dapars_short <- test_dapars_short[rowSums(is.na(test_dapars_short)) == 0, ]
-test_dapars_pdui <- test_dapars_pdui[rowSums(is.na(test_dapars_pdui)) == 0, ]
+utr_file <- "./dapars2_output.txt"
+dapars_data <- read.csv(utr_file, sep = "\t", row.names = 1)
+dapars_data <- dapars_data[, -c(1:3)]
+dapars_data <- dapars_data[, grepl("long", colnames(dapars_data))]
+colnames(dapars_data) <- str_remove(colnames(dapars_data), ".depth_PDUI")
+colnames(dapars_data) <- str_remove(colnames(dapars_data), ".depth_long_exp")
+dapars_data_long <- dapars_data
+dapars_data <- read.csv(utr_file, sep = "\t", row.names = 1)
+dapars_data <- dapars_data[, -c(1:3)]
+dapars_data <- dapars_data[, grepl("short", colnames(dapars_data))]
+colnames(dapars_data) <- str_remove(colnames(dapars_data), ".depth_PDUI")
+colnames(dapars_data) <- str_remove(colnames(dapars_data), ".depth_short_exp")
+dapars_data_short <- dapars_data
+dapars_data <- read.csv(utr_file, sep = "\t", row.names = 1)
+dapars_data <- dapars_data[, -c(1:3)]
+dapars_data <- dapars_data[, grepl("PDUI", colnames(dapars_data))]
+colnames(dapars_data) <- str_remove(colnames(dapars_data), ".depth_PDUI")
+dapars_data_pdui <- dapars_data
+dapars_data_long <- dapars_data_long[rowSums(is.na(dapars_data_long)) == 0, ]
+dapars_data_short <- dapars_data_short[rowSums(is.na(dapars_data_short)) == 0, ]
+dapars_data_pdui <- dapars_data_pdui[rowSums(is.na(dapars_data_pdui)) == 0, ]
 
-colnames(test_dapars) <- str_remove(colnames(test_dapars), "^X")
-test_dapars <- test_dapars[, !grepl(regex("X"), colnames(test_dapars))]
-test_dapars <- test_dapars[sapply(row.names(test_dapars), FUN = function(x) {
+colnames(dapars_data) <- str_remove(colnames(dapars_data), "^X")
+dapars_data <- dapars_data[, !grepl(regex("X"), colnames(dapars_data))]
+dapars_data <- dapars_data[sapply(row.names(dapars_data), FUN = function(x) {
   strsplit(x, "\\|")[[1]][2]
 }) %in% row.names(exprs(ce.ct)[rowMeans(exprs(ce.ct)) > 10, ]), ]
-test_dapars <- test_dapars[rowSums(is.na(test_dapars)) == 0, ]
+dapars_data <- dapars_data[rowSums(is.na(dapars_data)) == 0, ]
 
-utr_cov <- data.frame(names(colSums(!is.na(test_dapars))),
-  UTR_reads = qorts_utr_stat[colnames(test_dapars), "ReadPairs_UniqueGene_UTR"],
-  values = qorts_utr_stat[colnames(test_dapars), "ReadPairs_UniqueGene_UTR"] / qorts_utr_stat[colnames(test_dapars), "ReadPairs_UniqueGene"],
-  cellType = pData(ce.ct)[colnames(test_dapars), "cellType"]
+utr_cov <- data.frame(names(colSums(!is.na(dapars_data))),
+  UTR_reads = qorts_utr_stat[colnames(dapars_data), "ReadPairs_UniqueGene_UTR"],
+  values = qorts_utr_stat[colnames(dapars_data), "ReadPairs_UniqueGene_UTR"] / qorts_utr_stat[colnames(dapars_data), "ReadPairs_UniqueGene"],
+  cellType = pData(ce.ct)[colnames(dapars_data), "cellType"]
 )
 colnames(utr_cov)[1] <- "samp"
 ggplot(data = utr_cov, aes(x = values, fill = cellType)) +
   geom_histogram(bins = 30) +
   facet_wrap(~cellType)
-dapars_dist <- do.call(cbind, lapply(1:ncol(test_dapars), function(x) {
-  sapply(1:ncol(test_dapars), function(y) {
-    shared <- intersect(which(!is.na(test_dapars[, x])), which(!is.na(test_dapars[, y])))
-    cor(test_dapars[shared, x], test_dapars[shared, y])
+dapars_dist <- do.call(cbind, lapply(1:ncol(dapars_data), function(x) {
+  sapply(1:ncol(dapars_data), function(y) {
+    shared <- intersect(which(!is.na(dapars_data[, x])), which(!is.na(dapars_data[, y])))
+    cor(dapars_data[shared, x], dapars_data[shared, y])
   })
 }))
-colnames(dapars_dist) <- colnames(test_dapars)
-row.names(dapars_dist) <- colnames(test_dapars)
+colnames(dapars_dist) <- colnames(dapars_data)
+row.names(dapars_dist) <- colnames(dapars_data)
 utr_samples <- subset(utr_cov, values < 0.25 & values > 0.05 | cellType == "P0")[, 1]
 
-sample_PCA(log(test_dapars_pdui * rowMeans(test_dapars_long + test_dapars_short) + 1), pData(ce.ct)[utr_samples, ], umap = T, color_by = "cellType", labeling = F) + ggtitle("") + theme(legend.position = "none")
+sample_PCA(log(dapars_data_pdui * rowMeans(dapars_data_long + dapars_data_short) + 1), pData(ce.ct)[utr_samples, ], umap = T, color_by = "cellType", labeling = F) + ggtitle("") + theme(legend.position = "none")
 ggsave("APA_strict_umap.png")
 table(subset(utr_cov, values < 0.25 & values > 0.05 & !grepl(regex("Ce1|Ce2"), samp))$cellType)
 
-utr_file <- "./strict.txt"
-test_utr_F1_P0_all <- deg_utr(utr_file, exprs(ce.ct), compare = c("F1", "P0"), meta = pData(ce.ct), combine_p = "fisher")
-test_utr_F1_P0_all$gene_res$SYMBOL <- WORM.GENES[test_utr_F1_P0_all$gene_res$gene_short_names, "Public.Name"]
-test_utr_F1_P0 <- deg_utr(utr_file, exprs(ce.ct), compare = c("F1", "P0"), meta = pData(ce.ct), combine_p = "simes")
-test_utr_F1_P0$gene_res$SYMBOL <- WORM.GENES[test_utr_F1_P0$gene_res$gene_short_names, "Public.Name"]
-test_utr_F1_P0$gene_res$fdr[test_utr_F1_P0$gene_res$APA_dist < 40] <- 1
+utr_file <- "./dapars2_output.txt"
+dapars_data_F1_P0_all <- deg_utr(utr_file, exprs(ce.ct), compare = c("F1", "P0"), meta = pData(ce.ct), combine_p = "fisher")
+dapars_data_F1_P0_all$gene_res$SYMBOL <- WORM.GENES[dapars_data_F1_P0_all$gene_res$gene_short_names, "Public.Name"]
+dapars_data_F1_P0 <- deg_utr(utr_file, exprs(ce.ct), compare = c("F1", "P0"), meta = pData(ce.ct), combine_p = "simes")
+dapars_data_F1_P0$gene_res$SYMBOL <- WORM.GENES[dapars_data_F1_P0$gene_res$gene_short_names, "Public.Name"]
+dapars_data_F1_P0$gene_res$fdr[dapars_data_F1_P0$gene_res$APA_dist < 40] <- 1
 
 # seems like only F1 vs P0 produced significant changes in APA usage
-utr_F1_P0_ora <- enrich_CP(subset(test_utr_F1_P0$gene_res, fdr < 0.05 & abs(mean.diff) > 0.05)$gene_short_names, universe = test_utr_F1_P0$deg$gene_short_names, organisms = "celegans")
+utr_F1_P0_ora <- enrich_CP(subset(dapars_data_F1_P0$gene_res, fdr < 0.05 & abs(mean.diff) > 0.05)$gene_short_names, universe = dapars_data_F1_P0$deg$gene_short_names, organisms = "celegans")
 dot_test <- dotplot(clusterProfiler::simplify(utr_F1_P0_ora$GO_BP_ora)) + theme_classic()
-change_df <- do.call(rbind, lapply(lapply(strsplit(dot_test$data$geneID, "/"), function(x) row.names(WORM.GENES[match(x, WORM.GENES$Public.Name), ])), function(x) c(sum(test_utr_F1_P0$gene_res[x, "mean.diff"] > 0.05), sum(test_utr_F1_P0$gene_res[x, "mean.diff"] < -0.05))))
+change_df <- do.call(rbind, lapply(lapply(strsplit(dot_test$data$geneID, "/"), function(x) row.names(WORM.GENES[match(x, WORM.GENES$Public.Name), ])), function(x) c(sum(dapars_data_F1_P0$gene_res[x, "mean.diff"] > 0.05), sum(dapars_data_F1_P0$gene_res[x, "mean.diff"] < -0.05))))
 colnames(change_df) <- c("lengthened", "shortened")
 dot_test$data <- cbind(dot_test$data, change_df)
 
@@ -866,13 +832,13 @@ bar_test <- dot_test$data[, c("ID", "Description", "lengthened", "shortened")] %
   ylab("")
 
 dap_summary <- data.frame(rbind(
-  S1_v_S2 = c(nrow(subset(test_utr_S1_S2$gene_res, diff & mean.diff > 0)), nrow(subset(test_utr_S1_S2$gene_res, diff & mean.diff < 0))),
-  S2_v_S3 = c(nrow(subset(test_utr_S2_S3$gene_res, diff & mean.diff > 0)), nrow(subset(test_utr_S2_S3$gene_res, diff & mean.diff < 0))),
-  S3_v_S4 = c(nrow(subset(test_utr_S3_S4$gene_res, diff & mean.diff > 0)), nrow(subset(test_utr_S3_S4$gene_res, diff & mean.diff < 0))),
-  S4_v_F3 = c(nrow(subset(test_utr_S4_F3$gene_res, diff & mean.diff > 0)), nrow(subset(test_utr_S4_F3$gene_res, diff & mean.diff < 0))),
-  F3_v_F2 = c(nrow(subset(test_utr_F3_F2$gene_res, diff & mean.diff > 0)), nrow(subset(test_utr_F3_F2$gene_res, diff & mean.diff < 0))),
-  F2_v_F1 = c(nrow(subset(test_utr_F2_F1$gene_res, diff & mean.diff > 0)), nrow(subset(test_utr_F2_F1$gene_res, diff & mean.diff < 0))),
-  F1_v_P0 = c(nrow(subset(test_utr_F1_P0$gene_res, diff & mean.diff > 0)), nrow(subset(test_utr_F1_P0$gene_res, diff & mean.diff < 0)))
+  S1_v_S2 = c(nrow(subset(dapars_data_S1_S2$gene_res, diff & mean.diff > 0)), nrow(subset(dapars_data_S1_S2$gene_res, diff & mean.diff < 0))),
+  S2_v_S3 = c(nrow(subset(dapars_data_S2_S3$gene_res, diff & mean.diff > 0)), nrow(subset(dapars_data_S2_S3$gene_res, diff & mean.diff < 0))),
+  S3_v_S4 = c(nrow(subset(dapars_data_S3_S4$gene_res, diff & mean.diff > 0)), nrow(subset(dapars_data_S3_S4$gene_res, diff & mean.diff < 0))),
+  S4_v_F3 = c(nrow(subset(dapars_data_S4_F3$gene_res, diff & mean.diff > 0)), nrow(subset(dapars_data_S4_F3$gene_res, diff & mean.diff < 0))),
+  F3_v_F2 = c(nrow(subset(dapars_data_F3_F2$gene_res, diff & mean.diff > 0)), nrow(subset(dapars_data_F3_F2$gene_res, diff & mean.diff < 0))),
+  F2_v_F1 = c(nrow(subset(dapars_data_F2_F1$gene_res, diff & mean.diff > 0)), nrow(subset(dapars_data_F2_F1$gene_res, diff & mean.diff < 0))),
+  F1_v_P0 = c(nrow(subset(dapars_data_F1_P0$gene_res, diff & mean.diff > 0)), nrow(subset(dapars_data_F1_P0$gene_res, diff & mean.diff < 0)))
 ))
 colnames(dap_summary) <- c("lengthened", "shortened")
 dap_summary$Comparison <- factor(row.names(dap_summary), levels = row.names(dap_summary))
@@ -887,36 +853,32 @@ bar_test <- dap_summary %>%
   xlab("Comparisons") +
   ylab("Number of Genes")
 
-ggsave("./strict_DAP.png", width = 6, height = 3)
+dot_test %>% insert_right(bar_test, width = .8)
+ggsave("./DAP.png", width = 6, height = 3)
 
 dot_test %>% insert_right(bar_test, width = .8)
 
-test_utr_S1_S2 <- deg_utr(utr_file, exprs(ce.ct), compare = c("S1", "S2"), meta = pData(ce.ct), combine_p = "simes")
-test_utr_S1_S2$gene_res$SYMBOL <- WORM.GENES[test_utr_S1_S2$gene_res$gene_short_names, "Public.Name"]
-test_utr_S2_S3 <- deg_utr(utr_file, exprs(ce.ct), compare = c("S2", "S3"), meta = pData(ce.ct), combine_p = "simes")
-test_utr_S2_S3$gene_res$SYMBOL <- WORM.GENES[test_utr_S2_S3$gene_res$gene_short_names, "Public.Name"]
-test_utr_S3_S4 <- deg_utr(utr_file, exprs(ce.ct), compare = c("S3", "S4"), meta = pData(ce.ct), combine_p = "simes")
-test_utr_S3_S4$gene_res$SYMBOL <- WORM.GENES[test_utr_S3_S4$gene_res$gene_short_names, "Public.Name"]
-test_utr_S4_F3 <- deg_utr(utr_file, exprs(ce.ct), compare = c("S4", "F3"), meta = pData(ce.ct), combine_p = "simes")
-test_utr_S4_F3$gene_res$SYMBOL <- WORM.GENES[test_utr_S4_F3$gene_res$gene_short_names, "Public.Name"]
-test_utr_F3_F2 <- deg_utr(utr_file, exprs(ce.ct), compare = c("F3", "F2"), meta = pData(ce.ct), combine_p = "simes")
-test_utr_F3_F2$gene_res$SYMBOL <- WORM.GENES[test_utr_F3_F2$gene_res$gene_short_names, "Public.Name"]
-test_utr_F2_F1 <- deg_utr(utr_file, exprs(ce.ct), compare = c("F2", "F1"), meta = pData(ce.ct), combine_p = "simes")
-test_utr_F2_F1$gene_res$SYMBOL <- WORM.GENES[test_utr_F2_F1$gene_res$gene_short_names, "Public.Name"]
-
-utr_F1_P0_ora <- enrich_CP(subset(test_utr_F1_P0$gene_res, fdr < 0.05 & abs(mean.diff) > 0.05)$gene_short_names, universe = test_utr_F1_P0$deg$gene_short_names, organisms = "celegans")
-utr_F1_P0_ora_all <- enrich_CP(subset(test_utr_F1_P0_all$gene_res, fdr < 0.05 & abs(mean.diff) > 0.05)$gene_short_names, universe = test_utr_F1_P0_all$deg$gene_short_names, organisms = "celegans")
-
-utr_F2_F1_ora <- enrich_CP(subset(test_utr_F2_F1$gene_res, fdr < 0.05 & abs(mean.diff) > 0.05)$gene_short_names, universe = test_utr_F2_F1$gene_res$gene_short_names, organisms = "celegans")
-utr_S1_S2_ora <- enrich_CP(subset(test_utr_S1_S2$gene_res, fdr < 0.05 & abs(mean.diff) > 0.05)$gene_short_names, universe = test_utr_S1_S2$gene_res$gene_short_names, organisms = "celegans")
-utr_S2_S3_ora <- enrich_CP(subset(test_utr_S2_S3$gene_res, fdr < 0.05 & abs(mean.diff) > 0.05)$gene_short_names, universe = test_utr_S2_S3$gene_res$gene_short_names, organisms = "celegans")
-utr_S3_S4_ora <- enrich_CP(subset(test_utr_S2_S3$gene_res, fdr < 0.05 & abs(mean.diff) > 0.05)$gene_short_names, universe = test_utr_S2_S3$gene_res$gene_short_names, organisms = "celegans")
-utr_S4_F3_ora <- enrich_CP(subset(test_utr_S4_F3$gene_res, fdr < 0.05 & abs(mean.diff) > 0.05)$gene_short_names, universe = test_utr_S4_F3$gene_res$gene_short_names, organisms = "celegans")
-utr_F3_F2_ora <- enrich_CP(subset(test_utr_F3_F2$gene_res, fdr < 0.05 & abs(mean.diff) > 0.05)$gene_short_names, universe = test_utr_F3_F2$gene_res$gene_short_names, organisms = "celegans")
+dapars_data_S1_S2 <- deg_utr(utr_file, exprs(ce.ct), compare = c("S1", "S2"), meta = pData(ce.ct), combine_p = "simes")
+dapars_data_S1_S2$gene_res$SYMBOL <- WORM.GENES[dapars_data_S1_S2$gene_res$gene_short_names, "Public.Name"]
+dapars_data_S2_S3 <- deg_utr(utr_file, exprs(ce.ct), compare = c("S2", "S3"), meta = pData(ce.ct), combine_p = "simes")
+dapars_data_S2_S3$gene_res$SYMBOL <- WORM.GENES[dapars_data_S2_S3$gene_res$gene_short_names, "Public.Name"]
+dapars_data_S3_S4 <- deg_utr(utr_file, exprs(ce.ct), compare = c("S3", "S4"), meta = pData(ce.ct), combine_p = "simes")
+dapars_data_S3_S4$gene_res$SYMBOL <- WORM.GENES[dapars_data_S3_S4$gene_res$gene_short_names, "Public.Name"]
+dapars_data_S4_F3 <- deg_utr(utr_file, exprs(ce.ct), compare = c("S4", "F3"), meta = pData(ce.ct), combine_p = "simes")
+dapars_data_S4_F3$gene_res$SYMBOL <- WORM.GENES[dapars_data_S4_F3$gene_res$gene_short_names, "Public.Name"]
+dapars_data_F3_F2 <- deg_utr(utr_file, exprs(ce.ct), compare = c("F3", "F2"), meta = pData(ce.ct), combine_p = "simes")
+dapars_data_F3_F2$gene_res$SYMBOL <- WORM.GENES[dapars_data_F3_F2$gene_res$gene_short_names, "Public.Name"]
+dapars_data_F2_F1 <- deg_utr(utr_file, exprs(ce.ct), compare = c("F2", "F1"), meta = pData(ce.ct), combine_p = "simes")
+dapars_data_F2_F1$gene_res$SYMBOL <- WORM.GENES[dapars_data_F2_F1$gene_res$gene_short_names, "Public.Name"]
 
 
-
-utr_F1_P0_ora <- enrich_CP(subset(test_utr_F1_P0$gene_res, fdr < 0.05 & abs(mean.diff) > 0.1)$gene_short_names, universe = test_utr_F1_P0$gene_res$gene_short_names, organisms = "celegans")
+utr_F2_F1_ora <- enrich_CP(subset(dapars_data_F2_F1$gene_res, fdr < 0.05 & abs(mean.diff) > 0.05)$gene_short_names, universe = dapars_data_F2_F1$gene_res$gene_short_names, organisms = "celegans")
+utr_S1_S2_ora <- enrich_CP(subset(dapars_data_S1_S2$gene_res, fdr < 0.05 & abs(mean.diff) > 0.05)$gene_short_names, universe = dapars_data_S1_S2$gene_res$gene_short_names, organisms = "celegans")
+utr_S2_S3_ora <- enrich_CP(subset(dapars_data_S2_S3$gene_res, fdr < 0.05 & abs(mean.diff) > 0.05)$gene_short_names, universe = dapars_data_S2_S3$gene_res$gene_short_names, organisms = "celegans")
+utr_S3_S4_ora <- enrich_CP(subset(dapars_data_S2_S3$gene_res, fdr < 0.05 & abs(mean.diff) > 0.05)$gene_short_names, universe = dapars_data_S2_S3$gene_res$gene_short_names, organisms = "celegans")
+utr_S4_F3_ora <- enrich_CP(subset(dapars_data_S4_F3$gene_res, fdr < 0.05 & abs(mean.diff) > 0.05)$gene_short_names, universe = dapars_data_S4_F3$gene_res$gene_short_names, organisms = "celegans")
+utr_F3_F2_ora <- enrich_CP(subset(dapars_data_F3_F2$gene_res, fdr < 0.05 & abs(mean.diff) > 0.05)$gene_short_names, universe = dapars_data_F3_F2$gene_res$gene_short_names, organisms = "celegans")
+utr_F1_P0_ora <- enrich_CP(subset(dapars_data_F1_P0$gene_res, fdr < 0.05 & abs(mean.diff) > 0.1)$gene_short_names, universe = dapars_data_F1_P0$gene_res$gene_short_names, organisms = "celegans")
 
 
 
